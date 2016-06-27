@@ -149,7 +149,7 @@ const imperiParams = {
             ];
         },
         set: function(dev, action, value) {
-            console.log(`set thermostat ${action} to ${value}`);
+            //console.log(`set thermostat ${action} to ${value}`);
             switch (action) {
             case "setMode":
                 dev.standardSet("mode", value);
@@ -279,10 +279,10 @@ function handleRequest(req, res)
         }
     };
 
-    console.log("imperihome", path);
+    //console.log("imperihome", path);
     if (path[0] in handlers) {
         handlers[path[0]](path.slice(1), (obj) => {
-            console.log("writing", JSON.stringify(obj, null, 4));
+            //console.log("writing", JSON.stringify(obj, null, 4));
             if (typeof obj === "object") {
                 res.writeHead(200, {'Content-Type': 'application/json'});
                 res.end(JSON.stringify(obj));
