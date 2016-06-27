@@ -12,5 +12,8 @@
   "license": "BSD-2-Clause",
   "keywords": [
     "homework-plugin"
-  ]
+  ],
+  "software.homework": {
+    "moduleProtocol": 1
+  }
 }

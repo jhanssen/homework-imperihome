@@ -30,6 +30,85 @@ function convertType(type)
     return undefined;
 }
 
+const imperiParams = {
+    DevDimmer: {
+        get: function(dev) {
+            return [
+                {
+                    key: "Status",
+                    value: dev.standardGet("level") > 0 ? 1 : 0
+                },
+                {
+                    key: "Level",
+                    value: dev.standardGet("level")
+                }
+            ];
+        },
+        set: function(dev, action, value) {
+            //console.log(`set ${action} to ${value}`);
+            let meta = dev.standardMeta("level");
+            switch (action) {
+            case "setStatus":
+                // set max level
+                if (meta.range instanceof Array && meta.range.length > 1) {
+                    dev.standardSet("level", value == 1 ? meta.range[1] : meta.range[0]);
+                    return true;
+                }
+                break;
+            case "setLevel":
+                if (meta.range instanceof Array && meta.range.length > 1) {
+                    var val = parseInt(value);
+                    if (val < meta.range[0])
+                        val = meta.range[0];
+                    if (val > meta.range[1])
+                        val = meta.range[1];
+                    dev.standardSet("level", val);
+                    return true;
+                }
+            }
+            return false;
+        }
+    },
+    DevSwitch: {
+        get: function(dev) {
+            return [
+                {
+                    key: "Status",
+                    value: dev.standardGet("value") > 0 ? 1 : 0
+                }
+            ];
+        },
+        set: function(dev, action, value) {
+            //console.log(`set ${action} to ${value}`);
+            switch (action) {
+            case "setStatus":
+                // set max level
+                dev.standardSet("value", value == 1 ? 1 : 0);
+                return true;
+            }
+            return false;
+        }
+    },
+    DevMotion: {
+        get: function(dev) {
+            return [
+                {
+                    key: "armable",
+                    value: 0
+                },
+                {
+                    key: "ackable",
+                    value: 0
+                },
+                {
+                    key: "Tripped",
+                    value: dev.standardGet("Motion") ? 1 : 0
+                }
+            ];
+        }
+    }
+};
+
 const roomToID = Object.create(null);
 const IDtoRoom = Object.create(null);
 
@@ -73,25 +152,13 @@ function handleRequest(req, res)
                     var itype = convertType(hdev.type);
                     if (itype !== undefined) {
                         var idev = {
-                            id: "a" + i,//hdev.uuid,
+                            id: hdev.uuid,
                             name: hdev.name,
                             room: roomId(hdev.room, hdev.floor),
                             type: itype
                         };
-                        // var hvals = hdev.values;
-                        // var ivals = [];
-                        // for (var hvk in hvals) {
-                        //     var hval = hvals[hvk];
-                        //     ivals.push({
-                        //         key: hvk,
-                        //         value: hval.value,
-                        //         unit: hval.unit,
-                        //         graphable: false
-                        //     });
-                        // }
-                        // idev.params = ivals;
-                        var ivals = [{ key: "Status", value: 0 }, { key: "Energy", value: 0 }, { key: "pulseable", value: 0 }];
-                        idev.params = ivals;
+                        if (itype in imperiParams)
+                            idev.params = imperiParams[itype].get(hdev);
                         ret.push(idev);
                     }
                 }
@@ -100,13 +167,17 @@ function handleRequest(req, res)
                 // set value
                 let device = findDevice(this.homework, path[0]);
                 if (device) {
-                    if (path[2] in device.values) {
-                        console.log(`setting device to ${path[3]}`);
-                        device.values[path[2]].value = path[3];
-
-                        write({ success: true });
-                    } else {
-                        write("Couldn't find value");
+                    let ok = false;
+                    if ((itype = convertType(device.type))) {
+                        if (itype in imperiParams && "set" in imperiParams[itype]) {
+                            if (imperiParams[itype].set(device, path[2], path[3])) {
+                                write({ success: true });
+                                ok = true;
+                            }
+                        }
+                    }
+                    if (!ok) {
+                        write(`Couldn't set ${path[2]} for ${path[0]} to ${path[3]}`);
                     }
                 } else {
                     write("Couldn't find device");
@@ -146,7 +217,7 @@ function handleRequest(req, res)
     console.log("imperihome", path);
     if (path[0] in handlers) {
         handlers[path[0]](path.slice(1), (obj) => {
-            console.log("writing", obj);
+            console.log("writing", JSON.stringify(obj, null, 4));
             if (typeof obj === "object") {
                 res.writeHead(200, {'Content-Type': 'application/json'});
                 res.end(JSON.stringify(obj));
