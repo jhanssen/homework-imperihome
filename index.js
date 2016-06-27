@@ -106,6 +106,71 @@ const imperiParams = {
                 }
             ];
         }
+    },
+    DevThermostat: {
+        get: function(dev) {
+            // let metas = {
+            //     mode: dev.standardMeta("mode"),
+            //     fan: dev.standardMeta("fan"),
+            //     temperature: dev.standardMeta("temperature"),
+            //     setpoint: dev.standardMeta("setpoint")
+            // };
+            return [
+                {
+                    key: "curmode",
+                    value: dev.standardGet("mode")
+                },
+                {
+                    key: "curfanmode",
+                    value: dev.standardGet("fan")
+                },
+                {
+                    key: "curtemp",
+                    value: dev.standardGet("temperature").value,
+                    unit: "°" + dev.standardGet("temperature").units
+                },
+                {
+                    key: "cursetpoint",
+                    value: dev.standardGet("setpoint").value,
+                    unit: "°" + dev.standardGet("setpoint").units
+                },
+                {
+                    key: "step",
+                    value: "1"
+                },
+                {
+                    key: "availablemodes",
+                    value: "cool,heat,off"
+                },
+                {
+                    key: "availablefanmodes",
+                    value: "auto,off"
+                }
+            ];
+        },
+        set: function(dev, action, value) {
+            console.log(`set thermostat ${action} to ${value}`);
+            switch (action) {
+            case "setMode":
+                dev.standardSet("mode", value);
+                return true;
+            case "setFanMode":
+                dev.standardSet("fan", value);
+                return true;
+            case "setSetPoint":
+                let meta = dev.standardMeta("setpoint");
+                let fvalue = parseFloat(value);
+                if (meta.range instanceof Array && meta.range.length > 1) {
+                    if (fvalue < meta.range[0])
+                        fvalue = meta.range[0];
+                    if (fvalue > meta.range[1])
+                        fvalue = meta.range[1];
+                }
+                dev.standardSet("setpoint", fvalue);
+                return true;
+            }
+            return false;
+        }
     }
 };
 
