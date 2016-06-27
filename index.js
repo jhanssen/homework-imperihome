@@ -8,6 +8,8 @@ const url = require('url');
 const EventEmitter = require('events');
 const crypto = require('crypto');
 
+var Console;
+
 function convertType(type)
 {
     switch (type) {
@@ -30,144 +32,249 @@ function convertType(type)
     return undefined;
 }
 
+function extractColor(what, units, color) {
+    var pos = units.indexOf(what);
+    if (pos == -1)
+        return "";
+    return color.substr(pos, what.length);
+};
+
+function toImperiColor(dev)
+{
+    // WWRRGGBB
+    let color = dev.standardGet("Color");
+    let units = dev.standardMeta("Color").units;
+
+    let out = extractColor("WW", units, color);
+    out += extractColor("RR", units, color);
+    out += extractColor("GG", units, color);
+    out += extractColor("BB", units, color);
+    return out;
+}
+
+function fromImperiColor(dev, color)
+{
+    let units = dev.standardMeta("Color").units;
+
+    let out = "#";
+    for (var pos = 1; pos < units.length; pos += 2) {
+        out += extractColor(units.substr(pos, 2), "WWRRGGBB", color);
+    }
+    return out;
+}
+
 const imperiParams = {
     DevDimmer: {
         get: function(dev) {
-            return [
-                {
-                    key: "Status",
-                    value: dev.standardGet("level") > 0 ? 1 : 0
-                },
-                {
-                    key: "Level",
-                    value: dev.standardGet("level")
-                }
-            ];
+            try {
+                return [
+                    {
+                        key: "Status",
+                        value: dev.standardGet("level") > 0 ? 1 : 0
+                    },
+                    {
+                        key: "Level",
+                        value: dev.standardGet("level")
+                    }
+                ];
+            } catch (e) {
+                Console.error(e);
+                return [];
+            }
         },
         set: function(dev, action, value) {
             //console.log(`set ${action} to ${value}`);
-            let meta = dev.standardMeta("level");
-            switch (action) {
-            case "setStatus":
-                // set max level
-                if (meta.range instanceof Array && meta.range.length > 1) {
-                    dev.standardSet("level", value == 1 ? meta.range[1] : meta.range[0]);
-                    return true;
+            try {
+                let meta = dev.standardMeta("level");
+                switch (action) {
+                case "setStatus":
+                    // set max level
+                    if (meta.range instanceof Array && meta.range.length > 1) {
+                        dev.standardSet("level", value == 1 ? meta.range[1] : meta.range[0]);
+                        return true;
+                    }
+                    break;
+                case "setLevel":
+                    if (meta.range instanceof Array && meta.range.length > 1) {
+                        var val = parseInt(value);
+                        if (val < meta.range[0])
+                            val = meta.range[0];
+                        if (val > meta.range[1])
+                            val = meta.range[1];
+                        dev.standardSet("level", val);
+                        return true;
+                    }
                 }
-                break;
-            case "setLevel":
-                if (meta.range instanceof Array && meta.range.length > 1) {
-                    var val = parseInt(value);
-                    if (val < meta.range[0])
-                        val = meta.range[0];
-                    if (val > meta.range[1])
-                        val = meta.range[1];
-                    dev.standardSet("level", val);
-                    return true;
-                }
+            } catch (e) {
+                Console.error(e);
             }
             return false;
         }
     },
     DevSwitch: {
         get: function(dev) {
-            return [
-                {
-                    key: "Status",
-                    value: dev.standardGet("value") > 0 ? 1 : 0
-                }
-            ];
+            try {
+                return [
+                    {
+                        key: "Status",
+                        value: dev.standardGet("value") > 0 ? 1 : 0
+                    }
+                ];
+            } catch (e) {
+                Console.error(e);
+                return [];
+            }
         },
         set: function(dev, action, value) {
             //console.log(`set ${action} to ${value}`);
-            switch (action) {
-            case "setStatus":
-                // set max level
-                dev.standardSet("value", value == 1 ? 1 : 0);
-                return true;
+            try {
+                switch (action) {
+                case "setStatus":
+                    // set max level
+                    dev.standardSet("value", value == 1 ? 1 : 0);
+                    return true;
+                }
+            } catch (e) {
+                Console.error(e);
+            }
+            return false;
+        }
+    },
+    DevRGBLight: {
+        get: function(dev) {
+            try {
+                return [
+                    {
+                        key: "Status",
+                        value: /^#0+$/.test(dev.standardGet("Color")) ? 0 : 1
+                    },
+                    {
+                        key: "dimmable",
+                        value: 0
+                    },
+                    {
+                        key: "whitechannel",
+                        value: /WW/.test(dev.standardMeta("Color").units) ? 1 : 0
+                    },
+                    {
+                        key: "color",
+                        value: toImperiColor(dev)
+                    }
+                ];
+            } catch (e) {
+                Console.error(e);
+                return [];
+            }
+        },
+        set: function(dev, action, value) {
+            console.log(`set rgb ${action} to ${value}`);
+            try {
+                switch (action) {
+                case "setColor":
+                    // set max level
+                    dev.standardSet("Color", fromImperiColor(dev, value));
+                    return true;
+                }
+            } catch (e) {
+                Console.error(e);
             }
             return false;
         }
     },
     DevMotion: {
         get: function(dev) {
-            return [
-                {
-                    key: "armable",
-                    value: 0
-                },
-                {
-                    key: "ackable",
-                    value: 0
-                },
-                {
-                    key: "Tripped",
-                    value: dev.standardGet("Motion") ? 1 : 0
-                }
-            ];
+            try {
+                return [
+                    {
+                        key: "armable",
+                        value: 0
+                    },
+                    {
+                        key: "ackable",
+                        value: 0
+                    },
+                    {
+                        key: "Tripped",
+                        value: dev.standardGet("Motion") ? 1 : 0
+                    }
+                ];
+            } catch (e) {
+                Console.error(e);
+                return [];
+            }
         }
     },
     DevThermostat: {
         get: function(dev) {
-            // let metas = {
-            //     mode: dev.standardMeta("mode"),
-            //     fan: dev.standardMeta("fan"),
-            //     temperature: dev.standardMeta("temperature"),
-            //     setpoint: dev.standardMeta("setpoint")
-            // };
-            return [
-                {
-                    key: "curmode",
-                    value: dev.standardGet("mode")
-                },
-                {
-                    key: "curfanmode",
-                    value: dev.standardGet("fan")
-                },
-                {
-                    key: "curtemp",
-                    value: dev.standardGet("temperature").value,
-                    unit: "°" + dev.standardGet("temperature").units
-                },
-                {
-                    key: "cursetpoint",
-                    value: dev.standardGet("setpoint").value,
-                    unit: "°" + dev.standardGet("setpoint").units
-                },
-                {
-                    key: "step",
-                    value: "1"
-                },
-                {
-                    key: "availablemodes",
-                    value: "cool,heat,off"
-                },
-                {
-                    key: "availablefanmodes",
-                    value: "auto,off"
-                }
-            ];
+            try {
+                // let metas = {
+                //     mode: dev.standardMeta("mode"),
+                //     fan: dev.standardMeta("fan"),
+                //     temperature: dev.standardMeta("temperature"),
+                //     setpoint: dev.standardMeta("setpoint")
+                // };
+                return [
+                    {
+                        key: "curmode",
+                        value: dev.standardGet("mode")
+                    },
+                    {
+                        key: "curfanmode",
+                        value: dev.standardGet("fan")
+                    },
+                    {
+                        key: "curtemp",
+                        value: dev.standardGet("temperature").value,
+                        unit: "°" + dev.standardGet("temperature").units
+                    },
+                    {
+                        key: "cursetpoint",
+                        value: dev.standardGet("setpoint").value,
+                        unit: "°" + dev.standardGet("setpoint").units
+                    },
+                    {
+                        key: "step",
+                        value: "1"
+                    },
+                    {
+                        key: "availablemodes",
+                        value: "cool,heat,off"
+                    },
+                    {
+                        key: "availablefanmodes",
+                        value: "auto,off"
+                    }
+                ];
+            } catch (e) {
+                Console.error(e);
+                return [];
+            }
+
         },
         set: function(dev, action, value) {
             //console.log(`set thermostat ${action} to ${value}`);
-            switch (action) {
-            case "setMode":
-                dev.standardSet("mode", value);
-                return true;
-            case "setFanMode":
-                dev.standardSet("fan", value);
-                return true;
-            case "setSetPoint":
-                let meta = dev.standardMeta("setpoint");
-                let fvalue = parseFloat(value);
-                if (meta.range instanceof Array && meta.range.length > 1) {
-                    if (fvalue < meta.range[0])
-                        fvalue = meta.range[0];
-                    if (fvalue > meta.range[1])
-                        fvalue = meta.range[1];
+            try {
+                switch (action) {
+                case "setMode":
+                    dev.standardSet("mode", value);
+                    return true;
+                case "setFanMode":
+                    dev.standardSet("fan", value);
+                    return true;
+                case "setSetPoint":
+                    let meta = dev.standardMeta("setpoint");
+                    let fvalue = parseFloat(value);
+                    if (meta.range instanceof Array && meta.range.length > 1) {
+                        if (fvalue < meta.range[0])
+                            fvalue = meta.range[0];
+                        if (fvalue > meta.range[1])
+                            fvalue = meta.range[1];
+                    }
+                    dev.standardSet("setpoint", fvalue);
+                    return true;
                 }
-                dev.standardSet("setpoint", fvalue);
-                return true;
+            } catch (e) {
+                Console.error(e);
             }
             return false;
         }
@@ -318,6 +425,7 @@ ImperiHome.prototype = {
             cfg = {};
 
         this._homework = homework;
+        Console = homework.Console;
 
         var port = cfg.port || 8095;
 
